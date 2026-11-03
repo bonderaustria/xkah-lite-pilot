@@ -86,31 +86,6 @@ class XKahRemainingSensor(XKahSensorBase):
         return self._engine.remaining_seconds
 
 
-class XKahLearnedDurationSensor(XKahSensorBase):
-    _attr_device_class = SensorDeviceClass.DURATION
-    _attr_native_unit_of_measurement = "s"
-    _attr_icon = "mdi:brain"
-
-    def __init__(self, entry: ConfigEntry) -> None:
-        super().__init__(entry, "learned_duration", "Gelernte Zeit")
-
-    @property
-    def native_value(self) -> int:
-        return self._engine.learned_duration
-
-
-class XKahSessionCountSensor(XKahSensorBase):
-    _attr_state_class = SensorStateClass.TOTAL
-    _attr_icon = "mdi:counter"
-
-    def __init__(self, entry: ConfigEntry) -> None:
-        super().__init__(entry, "session_count", "Sessions")
-
-    @property
-    def native_value(self) -> int:
-        return self._engine.session_count
-
-
 class XKahSessionRemainingSensor(XKahSensorBase):
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = "s"
@@ -148,7 +123,5 @@ async def async_setup_entry(
         XKahProgressSensor(entry),
         XKahRemainingSensor(entry),
         XKahSessionRemainingSensor(entry),
-        XKahLearnedDurationSensor(entry),
-        XKahSessionCountSensor(entry),
         XKahCurrentPowerSensor(entry),
     ])
