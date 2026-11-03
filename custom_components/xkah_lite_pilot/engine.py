@@ -213,17 +213,12 @@ class XKahEngine:
         if self._ready_since is None:
             self._ready_since = now
 
-        if power > self._start_threshold:
-            # Heater turned back on during ready phase
-            self._ready_since = None
-            self._transition_to(STATE_PREHEATING, now)
-            return
-
         if power < DEFAULT_OFF_THRESHOLD:
             self._transition_to(STATE_COOLDOWN, now)
             return
 
-        if (now - self._ready_since).total_seconds() >= DEFAULT_READY_TIMEOUT:
+        elapsed = (now - self._ready_since).total_seconds()
+        if elapsed >= DEFAULT_SESSION_DURATION:
             self._transition_to(STATE_COOLDOWN, now)
 
     def _handle_cooldown(self, power: float, now: datetime) -> None:
