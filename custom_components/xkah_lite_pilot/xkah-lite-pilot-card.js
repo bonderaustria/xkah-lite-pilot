@@ -1,265 +1,183 @@
-const CARD_VERSION = "1.0.0";
-
 class XKahLitePilotCard extends HTMLElement {
-  set hass(hass) {
-    this._hass = hass;
+  constructor() {
+    super();
+    this._iv = null;
+    this._prevStatus = null;
+    this._sessionStart = null;
+    this._preheatStart = null;
+    this._built = false;
+  }
+
+  connectedCallback() {
+    this._startTimer();
+  }
+
+  disconnectedCallback() {
+    this._stopTimer();
+  }
+
+  _startTimer() {
+    if (!this._iv) this._iv = setInterval(() => this._tick(), 500);
+  }
+
+  _stopTimer() {
+    if (this._iv) { clearInterval(this._iv); this._iv = null; }
+  }
+
+  set hass(h) {
+    this._hass = h;
     if (!this._config) return;
-    this._render();
+    var e = this._ents();
+    var st = this._st(e.status);
+
+    if (st !== this._prevStatus) {
+      if (st === "preheating" && this._prevStatus !== "preheating") {
+        this._preheatStart = Date.now();
+      }
+      if (st === "ready" && this._prevStatus !== "ready") {
+        this._sessionStart = Date.now();
+      }
+      this._prevStatus = st;
+      this._build();
+    }
+
+    if (!this._preheatStart && st === "preheating") {
+      var r = this._num(e.remaining);
+      if (r > 0) this._preheatStart = Date.now() - (480 - r) * 1000;
+    }
+    if (!this._sessionStart && st === "ready") {
+      var sr = this._num(e.session_remaining);
+      if (sr > 0) this._sessionStart = Date.now() - (3000 - sr) * 1000;
+    }
+
+    this._tick();
+    this._startTimer();
   }
 
-  setConfig(config) {
-    if (!config.entity) throw new Error("entity (status sensor) required");
-    this._config = config;
-  }
+  setConfig(c) { if (!c.entity) throw new Error("entity required"); this._config = c; }
+  static getStubConfig() { return { entity: "" }; }
+  getCardSize() { return 4; }
 
-  static getStubConfig() {
-    return { entity: "" };
-  }
-
-  getCardSize() {
-    return 4;
-  }
-
-  _findEntities() {
-    const base = this._config.entity.replace("_status", "");
+  _ents() {
+    var b = this._config.entity.replace("_status", "");
     return {
       status: this._config.entity,
-      progress: `${base}_fortschritt`,
-      remaining: `${base}_verbleibend`,
-      session_remaining: `${base}_session_verbleibend`,
-      power: `${base}_aktuelle_leistung`,
-      switch_entity: `${base}_steckdose`,
+      remaining: b + "_verbleibend",
+      session_remaining: b + "_session_verbleibend",
+      power: b + "_aktuelle_leistung",
+      sw: b + "_steckdose"
     };
   }
 
-  _getState(entityId) {
-    const s = this._hass.states[entityId];
-    return s ? s.state : "unavailable";
+  _st(id) { var s = this._hass && this._hass.states[id]; return s ? s.state : "off"; }
+  _num(id) { var v = parseFloat(this._st(id)); return isNaN(v) ? 0 : v; }
+
+  _fmt(sec) {
+    if (sec < 0) sec = 0;
+    sec = Math.floor(sec);
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
   }
 
-  _getNumeric(entityId) {
-    const val = parseFloat(this._getState(entityId));
-    return isNaN(val) ? 0 : val;
-  }
+  _tick() {
+    if (!this._hass || !this._config || !this._built) return;
+    var e = this._ents();
+    var status = this._st(e.status);
+    var timer = this.querySelector("#t");
+    var ring = this.querySelector("#r");
+    var stEl = this.querySelector("#s");
+    var pwEl = this.querySelector("#p");
+    var icEl = this.querySelector("#i");
+    if (!timer || !ring) return;
 
-  _formatTime(totalSeconds) {
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
-    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  }
+    var C = 339.292;
+    var now = Date.now();
 
-  _toggleSwitch() {
-    const e = this._findEntities();
-    const state = this._getState(e.switch_entity);
-    this._hass.callService("switch", state === "on" ? "turn_off" : "turn_on", {
-      entity_id: e.switch_entity,
-    });
-  }
-
-  _render() {
-    const e = this._findEntities();
-    const status = this._getState(e.status);
-    const progress = this._getNumeric(e.progress);
-    const remaining = this._getNumeric(e.remaining);
-    const sessionRemaining = this._getNumeric(e.session_remaining);
-    const power = this._getNumeric(e.power);
-    const switchState = this._getState(e.switch_entity);
-
-    const isOff = status === "off";
-    const isPreheating = status === "preheating";
-    const isReady = status === "ready";
-    const isCooldown = status === "cooldown";
-
-    let statusText, statusColor, timerValue, timerLabel, ringProgress;
-
-    if (isPreheating) {
-      statusText = "PreHeat";
-      statusColor = "#ff6b35";
-      timerValue = this._formatTime(remaining);
-      timerLabel = "Verbleibend";
-      ringProgress = progress;
-    } else if (isReady) {
-      statusText = "Session";
-      statusColor = "#4caf50";
-      timerValue = this._formatTime(sessionRemaining);
-      timerLabel = "Session";
-      ringProgress = sessionRemaining > 0 ? ((3000 - sessionRemaining) / 3000) * 100 : 100;
-    } else if (isCooldown) {
-      statusText = "Abkühlen";
-      statusColor = "#78909c";
-      timerValue = "--:--";
-      timerLabel = "";
-      ringProgress = 100;
-    } else {
-      statusText = "Aus";
-      statusColor = "#555";
-      timerValue = "--:--";
-      timerLabel = "";
-      ringProgress = 0;
+    if (status === "preheating" && this._preheatStart) {
+      var elapsed = (now - this._preheatStart) / 1000;
+      var rem = Math.max(0, 480 - elapsed);
+      var fill = rem / 480;
+      timer.textContent = this._fmt(rem);
+      ring.setAttribute("stroke-dashoffset", (C * (1 - fill)).toFixed(1));
+      ring.setAttribute("stroke", "#ff6b35");
+      if (stEl) stEl.style.color = "#ff6b35";
+      if (icEl) icEl.style.color = "#ff6b35";
+    } else if (status === "ready" && this._sessionStart) {
+      var elapsed = (now - this._sessionStart) / 1000;
+      var rem = Math.max(0, 3000 - elapsed);
+      var fill = rem / 3000;
+      var col = fill > 0.5 ? "#4caf50" : fill > 0.3 ? "#ffc107" : "#f44336";
+      timer.textContent = this._fmt(rem);
+      ring.setAttribute("stroke-dashoffset", (C * (1 - fill)).toFixed(1));
+      ring.setAttribute("stroke", col);
+      if (stEl) stEl.style.color = col;
+      if (icEl) icEl.style.color = col;
     }
 
-    const circumference = 2 * Math.PI * 54;
-    const offset = circumference - (ringProgress / 100) * circumference;
+    if (pwEl) pwEl.textContent = this._num(e.power).toFixed(0) + " W";
+  }
 
-    this.innerHTML = `
-      <ha-card>
-        <style>
-          :host {
-            --xkah-bg: var(--card-background-color, #1c1c1e);
-            --xkah-text: var(--primary-text-color, #e0e0e0);
-            --xkah-muted: var(--secondary-text-color, #888);
-          }
-          .xkah-card {
-            padding: 20px;
-            text-align: center;
-          }
-          .xkah-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 16px;
-          }
-          .xkah-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--xkah-text);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-          }
-          .xkah-title ha-icon {
-            color: ${statusColor};
-          }
-          .xkah-power-badge {
-            font-size: 13px;
-            color: var(--xkah-muted);
-            background: rgba(255,255,255,0.06);
-            padding: 4px 10px;
-            border-radius: 12px;
-          }
-          .xkah-ring-container {
-            position: relative;
-            width: 140px;
-            height: 140px;
-            margin: 0 auto 16px;
-          }
-          .xkah-ring-container svg {
-            transform: rotate(-90deg);
-            width: 140px;
-            height: 140px;
-          }
-          .ring-bg {
-            fill: none;
-            stroke: rgba(255,255,255,0.08);
-            stroke-width: 8;
-          }
-          .ring-fg {
-            fill: none;
-            stroke: ${statusColor};
-            stroke-width: 8;
-            stroke-linecap: round;
-            stroke-dasharray: ${circumference};
-            stroke-dashoffset: ${offset};
-            transition: stroke-dashoffset 1s ease;
-          }
-          .xkah-ring-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-          }
-          .xkah-timer {
-            font-size: 28px;
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-            color: var(--xkah-text);
-            letter-spacing: 1px;
-          }
-          .xkah-timer-label {
-            font-size: 11px;
-            color: var(--xkah-muted);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 2px;
-          }
-          .xkah-status {
-            font-size: 14px;
-            font-weight: 600;
-            color: ${statusColor};
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 16px;
-          }
-          .xkah-switch-row {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            padding: 12px;
-            background: rgba(255,255,255,0.04);
-            border-radius: 12px;
-            cursor: pointer;
-          }
-          .xkah-switch-row:active {
-            background: rgba(255,255,255,0.08);
-          }
-          .xkah-switch-label {
-            font-size: 14px;
-            color: var(--xkah-text);
-          }
-          .xkah-switch-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: ${switchState === "on" ? "#4caf50" : "#555"};
-            box-shadow: ${switchState === "on" ? "0 0 8px rgba(76,175,80,0.5)" : "none"};
-          }
-        </style>
-        <div class="xkah-card">
-          <div class="xkah-header">
-            <div class="xkah-title">
-              <ha-icon icon="mdi:hookah"></ha-icon>
-              XKah Lite
-            </div>
-            <div class="xkah-power-badge">${power.toFixed(0)} W</div>
-          </div>
+  _toggle() {
+    var e = this._ents();
+    var s = this._st(e.sw);
+    this._hass.callService("switch", s === "on" ? "turn_off" : "turn_on", { entity_id: e.sw });
+  }
 
-          <div class="xkah-ring-container">
-            <svg viewBox="0 0 120 120">
-              <circle class="ring-bg" cx="60" cy="60" r="54"/>
-              <circle class="ring-fg" cx="60" cy="60" r="54"/>
-            </svg>
-            <div class="xkah-ring-text">
-              <div class="xkah-timer">${timerValue}</div>
-              ${timerLabel ? `<div class="xkah-timer-label">${timerLabel}</div>` : ""}
-            </div>
-          </div>
+  _build() {
+    var e = this._ents();
+    var status = this._st(e.status);
+    var pw = this._num(e.power);
+    var sw = this._st(e.sw) === "on";
 
-          <div class="xkah-status">${statusText}</div>
+    var lbl, col, tv, tl, fill;
+    if (status === "preheating") {
+      lbl = "PreHeat"; col = "#ff6b35"; tv = "08:00"; tl = "Verbleibend"; fill = 1;
+    } else if (status === "ready") {
+      lbl = "Session"; col = "#4caf50"; tv = "50:00"; tl = "Session"; fill = 1;
+    } else if (status === "cooldown") {
+      lbl = "Abkühlen"; col = "#78909c"; tv = "--:--"; tl = ""; fill = 0;
+    } else {
+      lbl = "Aus"; col = "#555"; tv = "--:--"; tl = ""; fill = 0;
+    }
 
-          <div class="xkah-switch-row" id="xkah-toggle">
-            <div class="xkah-switch-dot"></div>
-            <div class="xkah-switch-label">Steckdose ${switchState === "on" ? "Ein" : "Aus"}</div>
-          </div>
-        </div>
-      </ha-card>
-    `;
+    var C = 339.292;
 
-    this.querySelector("#xkah-toggle").addEventListener("click", () =>
-      this._toggleSwitch()
-    );
+    this.innerHTML = '<ha-card><style>'
+    + '.xc{padding:20px;text-align:center}'
+    + '.xh{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}'
+    + '.xn{font-size:18px;font-weight:600;color:var(--primary-text-color,#e0e0e0);display:flex;align-items:center;gap:8px}'
+    + '.xp{font-size:13px;color:var(--secondary-text-color,#888);background:rgba(255,255,255,.06);padding:4px 10px;border-radius:12px}'
+    + '.xw{position:relative;width:160px;height:160px;margin:0 auto 16px}'
+    + '.xw svg{transform:rotate(-90deg);width:160px;height:160px}'
+    + '.xm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}'
+    + '.xt{font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--primary-text-color,#e0e0e0);letter-spacing:1px}'
+    + '.xl{font-size:11px;color:var(--secondary-text-color,#888);text-transform:uppercase;letter-spacing:1px;margin-top:2px}'
+    + '.xs{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:2px;margin-bottom:16px}'
+    + '.xb{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px;background:rgba(255,255,255,.04);border-radius:12px;cursor:pointer}'
+    + '.xb:active{background:rgba(255,255,255,.08)}'
+    + '.xbl{font-size:14px;color:var(--primary-text-color,#e0e0e0)}'
+    + '.xd{width:12px;height:12px;border-radius:50%}'
+    + '</style><div class="xc">'
+    + '<div class="xh"><div class="xn"><ha-icon id="i" icon="mdi:hookah" style="color:' + col + '"></ha-icon>XKah Lite</div>'
+    + '<div class="xp" id="p">' + pw.toFixed(0) + ' W</div></div>'
+    + '<div class="xw"><svg viewBox="0 0 120 120">'
+    + '<circle fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8" cx="60" cy="60" r="54"/>'
+    + '<circle id="r" fill="none" stroke="' + col + '" stroke-width="8" stroke-linecap="round"'
+    + ' stroke-dasharray="' + C + '" stroke-dashoffset="' + (C * (1 - fill)).toFixed(1) + '" cx="60" cy="60" r="54"/>'
+    + '</svg><div class="xm"><div class="xt" id="t">' + tv + '</div>'
+    + (tl ? '<div class="xl">' + tl + '</div>' : '')
+    + '</div></div>'
+    + '<div class="xs" id="s" style="color:' + col + '">' + lbl + '</div>'
+    + '<div class="xb" id="b"><div class="xd" style="background:' + (sw ? "#4caf50" : "#555") + ';box-shadow:' + (sw ? "0 0 8px rgba(76,175,80,.5)" : "none") + '"></div>'
+    + '<div class="xbl">Steckdose ' + (sw ? "Ein" : "Aus") + '</div></div>'
+    + '</div></ha-card>';
+
+    this.querySelector("#b").addEventListener("click", () => this._toggle());
+    this._built = true;
   }
 }
 
 customElements.define("xkah-lite-pilot-card", XKahLitePilotCard);
-
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "xkah-lite-pilot-card",
-  name: "XKah Lite - Pilot",
-  description: "Dashboard Card für den XKah Lite",
-  preview: true,
-});
-
-console.info(`%c XKAH-LITE-PILOT-CARD v${CARD_VERSION} `, "background:#ff6b35;color:#fff;font-weight:bold;");
+window.customCards.push({ type: "xkah-lite-pilot-card", name: "XKah Lite - Pilot", description: "Dashboard Card", preview: true });
+console.info("%c XKAH v2.3 ", "background:#ff6b35;color:#fff;font-weight:bold");

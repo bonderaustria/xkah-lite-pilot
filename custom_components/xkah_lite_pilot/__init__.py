@@ -1,3 +1,4 @@
+import logging
 import os
 
 from homeassistant.components.http import StaticPathConfig
@@ -6,6 +7,8 @@ from homeassistant.core import HomeAssistant
 
 from .const import DATA_ENGINE, DOMAIN, PLATFORMS
 from .engine import XKahEngine
+
+_LOGGER = logging.getLogger(__name__)
 
 CARD_JS = "xkah-lite-pilot-card.js"
 CARD_URL = f"/{DOMAIN}/{CARD_JS}"
@@ -23,6 +26,20 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 
+async def _async_register_card_resource(hass: HomeAssistant) -> None:
+    try:
+        resources = hass.data.get("lovelace", {}).get("resources")
+        if resources is None:
+            return
+        for item in resources.async_items():
+            if CARD_URL in item.get("url", ""):
+                return
+        await resources.async_create_item({"url": CARD_URL, "res_type": "module"})
+        _LOGGER.info("Registered Lovelace resource: %s", CARD_URL)
+    except Exception:
+        _LOGGER.debug("Could not auto-register Lovelace resource", exc_info=True)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     engine = XKahEngine(hass, entry)
     hass.data[DOMAIN][entry.entry_id] = {DATA_ENGINE: engine}
@@ -33,6 +50,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+
+    await _async_register_card_resource(hass)
 
     return True
 

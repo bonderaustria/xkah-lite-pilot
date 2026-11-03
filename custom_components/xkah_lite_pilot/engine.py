@@ -160,11 +160,12 @@ class XKahEngine:
             return
         raw = new_state.state
         if raw in ("unavailable", "unknown", None):
-            return
-        try:
-            power = float(raw)
-        except (ValueError, TypeError):
-            return
+            power = 0.0
+        else:
+            try:
+                power = float(raw)
+            except (ValueError, TypeError):
+                return
         self._current_power = power
         self._process_power(power, utcnow())
 
