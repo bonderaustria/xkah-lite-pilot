@@ -18,6 +18,7 @@ from .const import (
     CONF_POWER_SENSOR,
     CONF_SWITCH_ENTITY,
     DEFAULT_COOLDOWN_TIMEOUT,
+    DEFAULT_LOW_POWER_GRACE,
     DEFAULT_OFF_THRESHOLD,
     DEFAULT_PREHEAT_DURATION,
     DEFAULT_READY_TIMEOUT,
@@ -55,6 +56,7 @@ class XKahEngine:
         self._start_candidate: datetime | None = None
         self._current_readings: list[tuple[float, float]] = []
 
+        self._low_power_since: datetime | None = None
         self._sessions: list[dict[str, Any]] = []
         self._learned_duration: int = DEFAULT_PREHEAT_DURATION
         self._start_threshold: float = DEFAULT_START_THRESHOLD
@@ -200,8 +202,14 @@ class XKahEngine:
         self._current_readings.append((ts, power))
 
         if power < DEFAULT_OFF_THRESHOLD:
-            self._transition_to(STATE_READY, now)
+            if self._low_power_since is None:
+                self._low_power_since = now
+            elif (now - self._low_power_since).total_seconds() >= DEFAULT_LOW_POWER_GRACE:
+                self._low_power_since = None
+                self._transition_to(STATE_READY, now)
             return
+        else:
+            self._low_power_since = None
 
         if self._learned_duration and self._session_start:
             elapsed = (now - self._session_start).total_seconds()
@@ -215,12 +223,13 @@ class XKahEngine:
             self._ready_since = now
 
         if power < DEFAULT_OFF_THRESHOLD:
-            self._transition_to(STATE_COOLDOWN, now)
-            return
-
-        elapsed = (now - self._ready_since).total_seconds()
-        if elapsed >= DEFAULT_SESSION_DURATION:
-            self._transition_to(STATE_COOLDOWN, now)
+            if self._low_power_since is None:
+                self._low_power_since = now
+            elif (now - self._low_power_since).total_seconds() >= DEFAULT_LOW_POWER_GRACE:
+                self._low_power_since = None
+                self._transition_to(STATE_COOLDOWN, now)
+        else:
+            self._low_power_since = None
 
     def _handle_cooldown(self, power: float, now: datetime) -> None:
         if power >= DEFAULT_OFF_THRESHOLD:
@@ -242,6 +251,7 @@ class XKahEngine:
             self._notification_sent = False
             self._ready_since = None
             self._session_end = None
+            self._low_power_since = None
 
         elif new_state == STATE_READY:
             self._ready_since = now
@@ -260,6 +270,7 @@ class XKahEngine:
             self._ready_since = None
             self._session_end = None
             self._notification_sent = False
+            self._low_power_since = None
 
         async_dispatcher_send(
             self.hass, f"{DOMAIN}_{self.entry.entry_id}_update"

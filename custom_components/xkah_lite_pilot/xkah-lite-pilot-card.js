@@ -31,23 +31,16 @@ class XKahCard extends HTMLElement {
     var st = this._st(e.status);
 
     if (st !== this._prevStatus) {
-      if (st === "preheating" && this._prevStatus !== "preheating") {
-        this._preheatStart = Date.now();
+      if (st === "preheating") {
+        var r = this._num(e.remaining);
+        this._preheatStart = (r > 0 && r < 480) ? Date.now() - (480 - r) * 1000 : Date.now();
       }
-      if (st === "ready" && this._prevStatus !== "ready") {
-        this._sessionStart = Date.now();
+      if (st === "ready") {
+        var sr = this._num(e.session_remaining);
+        this._sessionStart = (sr > 0 && sr < 3000) ? Date.now() - (3000 - sr) * 1000 : Date.now();
       }
       this._prevStatus = st;
       this._build();
-    }
-
-    if (!this._preheatStart && st === "preheating") {
-      var r = this._num(e.remaining);
-      if (r > 0) this._preheatStart = Date.now() - (480 - r) * 1000;
-    }
-    if (!this._sessionStart && st === "ready") {
-      var sr = this._num(e.session_remaining);
-      if (sr > 0) this._sessionStart = Date.now() - (3000 - sr) * 1000;
     }
 
     this._tick();
@@ -191,4 +184,4 @@ if (!customElements.get("xkah-card")) {
 }
 window.customCards = window.customCards || [];
 window.customCards.push({ type: "xkah-card", name: "XKah Lite - Pilot", description: "Dashboard Card", preview: true });
-console.info("%c XKAH v2.5 ", "background:#ff6b35;color:#fff;font-weight:bold");
+console.info("%c XKAH v2.6 ", "background:#ff6b35;color:#fff;font-weight:bold");
