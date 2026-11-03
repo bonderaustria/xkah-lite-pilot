@@ -1,4 +1,4 @@
-class XKahLitePilotCard extends HTMLElement {
+class XKahCard extends HTMLElement {
   constructor() {
     super();
     this._iv = null;
@@ -59,13 +59,13 @@ class XKahLitePilotCard extends HTMLElement {
   getCardSize() { return 4; }
 
   _ents() {
-    var b = this._config.entity.replace("_status", "");
+    var name = this._config.entity.replace("sensor.", "").replace("_status", "");
     return {
       status: this._config.entity,
-      remaining: b + "_verbleibend",
-      session_remaining: b + "_session_verbleibend",
-      power: b + "_aktuelle_leistung",
-      sw: b + "_steckdose"
+      remaining: "sensor." + name + "_verbleibend",
+      session_remaining: "sensor." + name + "_session_verbleibend",
+      power: "sensor." + name + "_aktuelle_leistung",
+      sw: "switch." + name + "_steckdose"
     };
   }
 
@@ -115,6 +115,15 @@ class XKahLitePilotCard extends HTMLElement {
     }
 
     if (pwEl) pwEl.textContent = this._num(e.power).toFixed(0) + " W";
+
+    var dotEl = this.querySelector("#dot");
+    var lblEl = this.querySelector("#slbl");
+    if (dotEl && lblEl) {
+      var swState = this._st(e.sw) === "on";
+      dotEl.style.background = swState ? "#4caf50" : "#555";
+      dotEl.style.boxShadow = swState ? "0 0 8px rgba(76,175,80,.5)" : "none";
+      lblEl.textContent = "Steckdose " + (swState ? "Ein" : "Aus");
+    }
   }
 
   _toggle() {
@@ -168,8 +177,8 @@ class XKahLitePilotCard extends HTMLElement {
     + (tl ? '<div class="xl">' + tl + '</div>' : '')
     + '</div></div>'
     + '<div class="xs" id="s" style="color:' + col + '">' + lbl + '</div>'
-    + '<div class="xb" id="b"><div class="xd" style="background:' + (sw ? "#4caf50" : "#555") + ';box-shadow:' + (sw ? "0 0 8px rgba(76,175,80,.5)" : "none") + '"></div>'
-    + '<div class="xbl">Steckdose ' + (sw ? "Ein" : "Aus") + '</div></div>'
+    + '<div class="xb" id="b"><div id="dot" class="xd" style="background:' + (sw ? "#4caf50" : "#555") + ';box-shadow:' + (sw ? "0 0 8px rgba(76,175,80,.5)" : "none") + '"></div>'
+    + '<div id="slbl" class="xbl">Steckdose ' + (sw ? "Ein" : "Aus") + '</div></div>'
     + '</div></ha-card>';
 
     this.querySelector("#b").addEventListener("click", () => this._toggle());
@@ -177,7 +186,9 @@ class XKahLitePilotCard extends HTMLElement {
   }
 }
 
-customElements.define("xkah-lite-pilot-card", XKahLitePilotCard);
+if (!customElements.get("xkah-card")) {
+  customElements.define("xkah-card", XKahCard);
+}
 window.customCards = window.customCards || [];
-window.customCards.push({ type: "xkah-lite-pilot-card", name: "XKah Lite - Pilot", description: "Dashboard Card", preview: true });
-console.info("%c XKAH v2.3 ", "background:#ff6b35;color:#fff;font-weight:bold");
+window.customCards.push({ type: "xkah-card", name: "XKah Lite - Pilot", description: "Dashboard Card", preview: true });
+console.info("%c XKAH v2.5 ", "background:#ff6b35;color:#fff;font-weight:bold");

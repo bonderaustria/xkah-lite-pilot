@@ -62,7 +62,7 @@ Die Card wird automatisch als Resource registriert. Zum Hinzufügen:
 2. Folgendes einfügen:
 
 ```yaml
-type: custom:xkah-lite-pilot-card
+type: custom:xkah-card
 entity: sensor.xkah_lite_status
 ```
 
