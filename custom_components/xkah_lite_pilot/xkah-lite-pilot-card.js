@@ -24,10 +24,10 @@ class XKahLitePilotCard extends HTMLElement {
     const base = this._config.entity.replace("_status", "");
     return {
       status: this._config.entity,
-      progress: `${base}_progress`,
-      remaining: `${base}_remaining`,
-      session_remaining: `${base}_session_remaining`,
-      power: `${base}_current_power`,
+      progress: `${base}_fortschritt`,
+      remaining: `${base}_verbleibend`,
+      session_remaining: `${base}_session_verbleibend`,
+      power: `${base}_aktuelle_leistung`,
       switch_entity: `${base}_steckdose`,
     };
   }

@@ -222,8 +222,8 @@ class XKahEngine:
             self._transition_to(STATE_COOLDOWN, now)
 
     def _handle_cooldown(self, power: float, now: datetime) -> None:
-        if power > self._start_threshold:
-            self._transition_to(STATE_PREHEATING, now)
+        if power >= DEFAULT_OFF_THRESHOLD:
+            self._session_end = now
             return
 
         if self._session_end:
