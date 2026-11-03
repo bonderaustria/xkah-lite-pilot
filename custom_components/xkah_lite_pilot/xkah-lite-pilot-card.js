@@ -3,8 +3,6 @@ class XKahCard extends HTMLElement {
     super();
     this._iv = null;
     this._prevStatus = null;
-    this._sessionStart = null;
-    this._preheatStart = null;
     this._built = false;
   }
 
@@ -17,7 +15,7 @@ class XKahCard extends HTMLElement {
   }
 
   _startTimer() {
-    if (!this._iv) this._iv = setInterval(() => this._tick(), 500);
+    if (!this._iv) this._iv = setInterval(() => this._tick(), 1000);
   }
 
   _stopTimer() {
@@ -31,14 +29,6 @@ class XKahCard extends HTMLElement {
     var st = this._st(e.status);
 
     if (st !== this._prevStatus) {
-      if (st === "preheating") {
-        var r = this._num(e.remaining);
-        this._preheatStart = (r > 0 && r < 480) ? Date.now() - (480 - r) * 1000 : Date.now();
-      }
-      if (st === "ready") {
-        var sr = this._num(e.session_remaining);
-        this._sessionStart = (sr > 0 && sr < 3000) ? Date.now() - (3000 - sr) * 1000 : Date.now();
-      }
       this._prevStatus = st;
       this._build();
     }
@@ -84,20 +74,17 @@ class XKahCard extends HTMLElement {
     if (!timer || !ring) return;
 
     var C = 339.292;
-    var now = Date.now();
 
-    if (status === "preheating" && this._preheatStart) {
-      var elapsed = (now - this._preheatStart) / 1000;
-      var rem = Math.max(0, 480 - elapsed);
+    if (status === "preheating") {
+      var rem = this._num(e.remaining);
       var fill = rem / 480;
       timer.textContent = this._fmt(rem);
       ring.setAttribute("stroke-dashoffset", (C * (1 - fill)).toFixed(1));
       ring.setAttribute("stroke", "#ff6b35");
       if (stEl) stEl.style.color = "#ff6b35";
       if (icEl) icEl.style.color = "#ff6b35";
-    } else if (status === "ready" && this._sessionStart) {
-      var elapsed = (now - this._sessionStart) / 1000;
-      var rem = Math.max(0, 3000 - elapsed);
+    } else if (status === "ready") {
+      var rem = this._num(e.session_remaining);
       var fill = rem / 3000;
       var col = fill > 0.5 ? "#4caf50" : fill > 0.3 ? "#ffc107" : "#f44336";
       timer.textContent = this._fmt(rem);
@@ -133,9 +120,12 @@ class XKahCard extends HTMLElement {
 
     var lbl, col, tv, tl, fill;
     if (status === "preheating") {
-      lbl = "PreHeat"; col = "#ff6b35"; tv = "08:00"; tl = "Verbleibend"; fill = 1;
+      lbl = "PreHeat"; col = "#ff6b35"; tv = this._fmt(this._num(e.remaining)); tl = "Verbleibend"; fill = this._num(e.remaining) / 480;
     } else if (status === "ready") {
-      lbl = "Session"; col = "#4caf50"; tv = "50:00"; tl = "Session"; fill = 1;
+      var rem = this._num(e.session_remaining);
+      var f = rem / 3000;
+      col = f > 0.5 ? "#4caf50" : f > 0.3 ? "#ffc107" : "#f44336";
+      lbl = "Session"; tv = this._fmt(rem); tl = "Session"; fill = f;
     } else if (status === "cooldown") {
       lbl = "Abkühlen"; col = "#78909c"; tv = "--:--"; tl = ""; fill = 0;
     } else {
@@ -184,4 +174,4 @@ if (!customElements.get("xkah-card")) {
 }
 window.customCards = window.customCards || [];
 window.customCards.push({ type: "xkah-card", name: "XKah Lite - Pilot", description: "Dashboard Card", preview: true });
-console.info("%c XKAH v2.6 ", "background:#ff6b35;color:#fff;font-weight:bold");
+console.info("%c XKAH v3.0 ", "background:#ff6b35;color:#fff;font-weight:bold");

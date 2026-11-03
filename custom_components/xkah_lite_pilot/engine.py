@@ -34,7 +34,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-TICK_INTERVAL = 10
+TICK_INTERVAL = 1
 
 
 class XKahEngine:
@@ -135,9 +135,11 @@ class XKahEngine:
 
     @callback
     def _async_tick(self, now: datetime) -> None:
-        if self._state == STATE_OFF:
-            return
-        self._process_power(self._current_power, now)
+        if self._state in (STATE_PREHEATING, STATE_READY):
+            self._process_power(self._current_power, now)
+            async_dispatcher_send(
+                self.hass, f"{DOMAIN}_{self.entry.entry_id}_update"
+            )
 
     def _process_power(self, power: float, now: datetime) -> None:
         prev_state = self._state
