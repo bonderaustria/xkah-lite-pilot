@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
@@ -10,6 +10,7 @@ from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
 )
+from homeassistant.helpers.storage import Store
 from homeassistant.util.dt import utcnow
 
 from .const import (
@@ -35,6 +36,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 TICK_INTERVAL = 1
+STORAGE_VERSION = 1
 
 
 class XKahEngine:
@@ -56,6 +58,7 @@ class XKahEngine:
         self._notification_sent: bool = False
         self._unsub_power: CALLBACK_TYPE | None = None
         self._unsub_tick: CALLBACK_TYPE | None = None
+        self._store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}")
 
     @property
     def state(self) -> str:
@@ -99,15 +102,18 @@ class XKahEngine:
         return self._switch_entity
 
     async def async_start(self) -> None:
-        from datetime import timedelta
-
+        await self._async_restore()
         self._unsub_power = async_track_state_change_event(
             self.hass, self._power_sensor, self._async_handle_power_update
         )
         self._unsub_tick = async_track_time_interval(
             self.hass, self._async_tick, timedelta(seconds=TICK_INTERVAL)
         )
-        _LOGGER.info("XKah engine started for %s", self.entry.title)
+        _LOGGER.info(
+            "XKah engine started for %s (state=%s)",
+            self.entry.title,
+            self._state,
+        )
 
     async def async_stop(self) -> None:
         if self._unsub_power:
@@ -116,6 +122,39 @@ class XKahEngine:
         if self._unsub_tick:
             self._unsub_tick()
             self._unsub_tick = None
+        await self._async_save()
+
+    async def _async_save(self) -> None:
+        data = {"state": self._state}
+        if self._session_start:
+            data["session_start"] = self._session_start.isoformat()
+        if self._ready_since:
+            data["ready_since"] = self._ready_since.isoformat()
+        if self._session_end:
+            data["session_end"] = self._session_end.isoformat()
+        data["notification_sent"] = self._notification_sent
+        await self._store.async_save(data)
+
+    async def _async_restore(self) -> None:
+        data = await self._store.async_load()
+        if not data:
+            return
+        saved_state = data.get("state", STATE_OFF)
+        if saved_state == STATE_OFF:
+            return
+        try:
+            if data.get("session_start"):
+                self._session_start = datetime.fromisoformat(data["session_start"])
+            if data.get("ready_since"):
+                self._ready_since = datetime.fromisoformat(data["ready_since"])
+            if data.get("session_end"):
+                self._session_end = datetime.fromisoformat(data["session_end"])
+            self._notification_sent = data.get("notification_sent", False)
+            self._state = saved_state
+            _LOGGER.info("XKah state restored: %s", self._state)
+        except (ValueError, TypeError):
+            _LOGGER.warning("Could not restore state, starting fresh")
+            self._state = STATE_OFF
 
     @callback
     def _async_handle_power_update(self, event: Event) -> None:
@@ -236,6 +275,7 @@ class XKahEngine:
         async_dispatcher_send(
             self.hass, f"{DOMAIN}_{self.entry.entry_id}_update"
         )
+        self.hass.async_create_task(self._async_save())
 
     async def _async_send_notification(self) -> None:
         service = self.entry.options.get(CONF_NOTIFY_SERVICE)
