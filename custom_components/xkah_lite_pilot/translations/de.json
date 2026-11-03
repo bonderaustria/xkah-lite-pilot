@@ -1,0 +1,32 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "XKah Lite - Pilot",
+        "description": "Wähle die Steckdose aus, an der dein XKah Lite hängt. Der Leistungssensor wird automatisch erkannt.",
+        "data": {
+          "switch_entity": "Steckdose"
+        }
+      },
+      "power": {
+        "title": "Leistungssensor",
+        "description": "Auf dem Gerät wurde kein Leistungssensor gefunden. Bitte wähle ihn manuell aus.",
+        "data": {
+          "power_sensor": "Leistungssensor (W)"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Benachrichtigungen",
+        "data": {
+          "notify_service": "Benachrichtigungsdienst (z.B. notify.mobile_app_iphone)",
+          "notify_title": "Titel",
+          "notify_message": "Nachricht"
+        }
+      }
+    }
+  }
+}
