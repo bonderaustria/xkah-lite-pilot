@@ -82,7 +82,7 @@ class XKahRemainingSensor(XKahSensorBase):
         super().__init__(entry, "remaining", "Verbleibend")
 
     @property
-    def native_value(self) -> int | None:
+    def native_value(self) -> int:
         return self._engine.remaining_seconds
 
 
@@ -95,7 +95,7 @@ class XKahLearnedDurationSensor(XKahSensorBase):
         super().__init__(entry, "learned_duration", "Gelernte Zeit")
 
     @property
-    def native_value(self) -> int | None:
+    def native_value(self) -> int:
         return self._engine.learned_duration
 
 

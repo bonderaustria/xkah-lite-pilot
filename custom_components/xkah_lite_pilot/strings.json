@@ -14,15 +14,24 @@
         "data": {
           "power_sensor": "Leistungssensor (W)"
         }
+      },
+      "notify": {
+        "title": "Benachrichtigung",
+        "description": "Wähle aus, wie du benachrichtigt werden möchtest wenn die Kohle fertig ist.",
+        "data": {
+          "notify_service": "Benachrichtigungsdienst",
+          "notify_title": "Titel",
+          "notify_message": "Nachricht"
+        }
       }
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Benachrichtigungen",
+        "title": "Benachrichtigung",
         "data": {
-          "notify_service": "Benachrichtigungsdienst (z.B. notify.mobile_app_iphone)",
+          "notify_service": "Benachrichtigungsdienst",
           "notify_title": "Titel",
           "notify_message": "Nachricht"
         }

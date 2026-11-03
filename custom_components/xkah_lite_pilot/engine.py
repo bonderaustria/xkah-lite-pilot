@@ -19,6 +19,7 @@ from .const import (
     CONF_SWITCH_ENTITY,
     DEFAULT_COOLDOWN_TIMEOUT,
     DEFAULT_OFF_THRESHOLD,
+    DEFAULT_PREHEAT_DURATION,
     DEFAULT_READY_TIMEOUT,
     DEFAULT_START_DURATION,
     DEFAULT_START_THRESHOLD,
@@ -54,7 +55,7 @@ class XKahEngine:
         self._current_readings: list[tuple[float, float]] = []
 
         self._sessions: list[dict[str, Any]] = []
-        self._learned_duration: int | None = None
+        self._learned_duration: int = DEFAULT_PREHEAT_DURATION
         self._start_threshold: float = DEFAULT_START_THRESHOLD
 
         self._unsub: callback | None = None
@@ -73,8 +74,6 @@ class XKahEngine:
     def progress(self) -> int:
         if self._state != STATE_PREHEATING or not self._session_start:
             return 0
-        if not self._learned_duration:
-            return 0
         elapsed = (utcnow() - self._session_start).total_seconds()
         return min(99, int(elapsed / self._learned_duration * 100))
 
@@ -82,13 +81,11 @@ class XKahEngine:
     def remaining_seconds(self) -> int:
         if self._state != STATE_PREHEATING or not self._session_start:
             return 0
-        if not self._learned_duration:
-            return 0
         elapsed = (utcnow() - self._session_start).total_seconds()
         return max(0, int(self._learned_duration - elapsed))
 
     @property
-    def learned_duration(self) -> int | None:
+    def learned_duration(self) -> int:
         return self._learned_duration
 
     @property
@@ -117,7 +114,9 @@ class XKahEngine:
         data = await self._store.async_load()
         if data:
             self._sessions = data.get("sessions", [])
-            self._learned_duration = data.get("learned_duration")
+            self._learned_duration = data.get(
+                "learned_duration", DEFAULT_PREHEAT_DURATION
+            )
             self._start_threshold = data.get(
                 "start_threshold", DEFAULT_START_THRESHOLD
             )
@@ -293,9 +292,9 @@ class XKahEngine:
         )
         await self._async_save()
 
-    def _calculate_learned_duration(self) -> int | None:
+    def _calculate_learned_duration(self) -> int:
         if len(self._sessions) < MIN_SESSIONS_FOR_LEARNING:
-            return None
+            return DEFAULT_PREHEAT_DURATION
         total_weight = 0.0
         weighted_sum = 0.0
         n = len(self._sessions)

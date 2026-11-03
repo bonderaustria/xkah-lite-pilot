@@ -5,10 +5,13 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
 )
 
@@ -38,6 +41,15 @@ STEP_POWER_SCHEMA = vol.Schema(
 )
 
 
+def _get_notify_services(hass) -> list[dict[str, str]]:
+    services = hass.services.async_services_for_domain("notify")
+    options = [{"value": "", "label": "Keine Benachrichtigung"}]
+    for service_name in sorted(services):
+        full = f"notify.{service_name}"
+        options.append({"value": full, "label": full})
+    return options
+
+
 class XKahLitePilotConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
@@ -57,14 +69,7 @@ class XKahLitePilotConfigFlow(ConfigFlow, domain=DOMAIN):
             power = self._find_power_sensor(self._switch_entity)
             if power:
                 self._power_sensor = power
-                return self.async_create_entry(
-                    title="XKah Lite",
-                    data={
-                        CONF_SWITCH_ENTITY: self._switch_entity,
-                        CONF_POWER_SENSOR: self._power_sensor,
-                    },
-                )
-            return await self.async_step_power()
+            return await self.async_step_notify()
         return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA)
 
     async def async_step_power(
@@ -72,20 +77,55 @@ class XKahLitePilotConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         if user_input is not None:
             self._power_sensor = user_input[CONF_POWER_SENSOR]
+            return await self.async_step_notify()
+        return self.async_show_form(
+            step_id="power",
+            data_schema=STEP_POWER_SCHEMA,
+        )
+
+    async def async_step_notify(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if not self._power_sensor:
+            return await self.async_step_power()
+
+        if user_input is not None:
+            notify_service = user_input.get(CONF_NOTIFY_SERVICE, "")
             return self.async_create_entry(
                 title="XKah Lite",
                 data={
                     CONF_SWITCH_ENTITY: self._switch_entity,
                     CONF_POWER_SENSOR: self._power_sensor,
                 },
+                options={
+                    CONF_NOTIFY_SERVICE: notify_service,
+                    CONF_NOTIFY_TITLE: user_input.get(
+                        CONF_NOTIFY_TITLE, "XKah Lite"
+                    ),
+                    CONF_NOTIFY_MESSAGE: user_input.get(
+                        CONF_NOTIFY_MESSAGE, "Deine Kohle ist fertig!"
+                    ),
+                },
             )
-        return self.async_show_form(
-            step_id="power",
-            data_schema=STEP_POWER_SCHEMA,
-            description_placeholders={
-                "switch_entity": self._switch_entity or "",
-            },
+
+        notify_options = _get_notify_services(self.hass)
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_NOTIFY_SERVICE, default=""): SelectSelector(
+                    SelectSelectorConfig(
+                        options=notify_options,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(
+                    CONF_NOTIFY_TITLE, default="XKah Lite"
+                ): TextSelector(),
+                vol.Optional(
+                    CONF_NOTIFY_MESSAGE, default="Deine Kohle ist fertig!"
+                ): TextSelector(),
+            }
         )
+        return self.async_show_form(step_id="notify", data_schema=schema)
 
     def _find_power_sensor(self, switch_entity_id: str) -> str | None:
         ent_reg = er.async_get(self.hass)
@@ -115,12 +155,20 @@ class XKahLitePilotOptionsFlow(OptionsFlow):
             return self.async_create_entry(data=user_input)
 
         options = self._config_entry.options
+        notify_options = _get_notify_services(self.hass)
+        current_service = options.get(CONF_NOTIFY_SERVICE, "")
+
         schema = vol.Schema(
             {
                 vol.Optional(
                     CONF_NOTIFY_SERVICE,
-                    default=options.get(CONF_NOTIFY_SERVICE, ""),
-                ): TextSelector(),
+                    default=current_service,
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=notify_options,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
                 vol.Optional(
                     CONF_NOTIFY_TITLE,
                     default=options.get(CONF_NOTIFY_TITLE, "XKah Lite"),
