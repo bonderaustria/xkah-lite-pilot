@@ -1,12 +1,22 @@
+import os
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DATA_ENGINE, DOMAIN, PLATFORMS
 from .engine import XKahEngine
 
+CARD_JS = "xkah-lite-pilot-card.js"
+CARD_URL = f"/{DOMAIN}/{CARD_JS}"
+
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
+    hass.http.register_static_path(
+        CARD_URL,
+        os.path.join(os.path.dirname(__file__), CARD_JS),
+        cache_headers=False,
+    )
     return True
 
 

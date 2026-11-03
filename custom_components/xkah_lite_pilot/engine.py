@@ -21,6 +21,7 @@ from .const import (
     DEFAULT_OFF_THRESHOLD,
     DEFAULT_PREHEAT_DURATION,
     DEFAULT_READY_TIMEOUT,
+    DEFAULT_SESSION_DURATION,
     DEFAULT_START_DURATION,
     DEFAULT_START_THRESHOLD,
     DOMAIN,
@@ -91,6 +92,13 @@ class XKahEngine:
     @property
     def session_count(self) -> int:
         return len(self._sessions)
+
+    @property
+    def session_remaining(self) -> int:
+        if self._state != STATE_READY or not self._ready_since:
+            return 0
+        elapsed = (utcnow() - self._ready_since).total_seconds()
+        return max(0, int(DEFAULT_SESSION_DURATION - elapsed))
 
     @property
     def is_running(self) -> bool:
@@ -323,7 +331,7 @@ class XKahEngine:
         domain, service_name = parts
         title = self.entry.options.get(CONF_NOTIFY_TITLE, "XKah Lite")
         message = self.entry.options.get(
-            CONF_NOTIFY_MESSAGE, "Deine Kohle ist fertig!"
+            CONF_NOTIFY_MESSAGE, "XKah Lite - PreHeat abgeschlossen!"
         )
         try:
             await self.hass.services.async_call(

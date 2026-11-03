@@ -111,6 +111,20 @@ class XKahSessionCountSensor(XKahSensorBase):
         return self._engine.session_count
 
 
+class XKahSessionRemainingSensor(XKahSensorBase):
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = "s"
+    _attr_icon = "mdi:timer-sand"
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        super().__init__(entry, "session_remaining", "Session Verbleibend")
+
+    @property
+    def native_value(self) -> int:
+        return self._engine.session_remaining
+
+
 class XKahCurrentPowerSensor(XKahSensorBase):
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = "W"
@@ -133,6 +147,7 @@ async def async_setup_entry(
         XKahStatusSensor(entry),
         XKahProgressSensor(entry),
         XKahRemainingSensor(entry),
+        XKahSessionRemainingSensor(entry),
         XKahLearnedDurationSensor(entry),
         XKahSessionCountSensor(entry),
         XKahCurrentPowerSensor(entry),

@@ -11,7 +11,7 @@ from .const import DATA_ENGINE, DOMAIN
 
 class XKahMarkReadyButton(ButtonEntity):
     _attr_has_entity_name = True
-    _attr_name = "Kohle fertig"
+    _attr_name = "PreHeat fertig"
     _attr_icon = "mdi:check-circle"
 
     def __init__(self, entry: ConfigEntry) -> None:

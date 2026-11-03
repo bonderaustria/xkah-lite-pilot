@@ -17,7 +17,7 @@
       },
       "notify": {
         "title": "Benachrichtigung",
-        "description": "Wähle aus, wie du benachrichtigt werden möchtest wenn die Kohle fertig ist.",
+        "description": "Wähle aus, wie du benachrichtigt werden möchtest wenn der PreHeat fertig ist.",
         "data": {
           "notify_service": "Benachrichtigungsdienst",
           "notify_title": "Titel",

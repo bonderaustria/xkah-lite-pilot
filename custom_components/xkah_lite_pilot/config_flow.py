@@ -103,7 +103,7 @@ class XKahLitePilotConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_NOTIFY_TITLE, "XKah Lite"
                     ),
                     CONF_NOTIFY_MESSAGE: user_input.get(
-                        CONF_NOTIFY_MESSAGE, "Deine Kohle ist fertig!"
+                        CONF_NOTIFY_MESSAGE, "XKah Lite - PreHeat abgeschlossen!"
                     ),
                 },
             )
@@ -121,7 +121,7 @@ class XKahLitePilotConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_NOTIFY_TITLE, default="XKah Lite"
                 ): TextSelector(),
                 vol.Optional(
-                    CONF_NOTIFY_MESSAGE, default="Deine Kohle ist fertig!"
+                    CONF_NOTIFY_MESSAGE, default="XKah Lite - PreHeat abgeschlossen!"
                 ): TextSelector(),
             }
         )
@@ -176,7 +176,7 @@ class XKahLitePilotOptionsFlow(OptionsFlow):
                 vol.Optional(
                     CONF_NOTIFY_MESSAGE,
                     default=options.get(
-                        CONF_NOTIFY_MESSAGE, "Deine Kohle ist fertig!"
+                        CONF_NOTIFY_MESSAGE, "XKah Lite - PreHeat abgeschlossen!"
                     ),
                 ): TextSelector(),
             }
