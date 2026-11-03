@@ -97,14 +97,6 @@ OFF → PREHEATING → READY (Session) → COOLDOWN → OFF
 
 **Wichtig:** Solange der XKah läuft (auch wenn die Leistung schwankt), bleibt die Session aktiv. Erst wenn der Verbrauch 2 Minuten durchgehend unter 3 W liegt, wird der Cooldown abgeschlossen.
 
-### Typischer Stromverbrauch
-
-| Zustand | Leistung |
-|---|---|
-| Aus / Standby | 0–1 W |
-| PreHeat | 20–30 W |
-| Betrieb (285°C) | ~13 W |
-
 ---
 
 ## Entities
