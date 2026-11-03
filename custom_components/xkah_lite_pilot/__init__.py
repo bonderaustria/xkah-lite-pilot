@@ -1,5 +1,6 @@
 import os
 
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
@@ -12,11 +13,13 @@ CARD_URL = f"/{DOMAIN}/{CARD_JS}"
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
-    hass.http.register_static_path(
-        CARD_URL,
-        os.path.join(os.path.dirname(__file__), CARD_JS),
-        cache_headers=False,
-    )
+    await hass.http.async_register_static_paths([
+        StaticPathConfig(
+            url_path=CARD_URL,
+            path=os.path.join(os.path.dirname(__file__), CARD_JS),
+            cache_headers=False,
+        )
+    ])
     return True
 
 
