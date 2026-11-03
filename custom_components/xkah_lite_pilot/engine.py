@@ -4,9 +4,12 @@ import logging
 from datetime import datetime
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.util.dt import utcnow
 
 from .const import (
@@ -31,6 +34,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+TICK_INTERVAL = 10
+
 
 class XKahEngine:
 
@@ -49,7 +54,8 @@ class XKahEngine:
         self._start_candidate: datetime | None = None
         self._low_power_since: datetime | None = None
         self._notification_sent: bool = False
-        self._unsub: callback | None = None
+        self._unsub_power: CALLBACK_TYPE | None = None
+        self._unsub_tick: CALLBACK_TYPE | None = None
 
     @property
     def state(self) -> str:
@@ -93,15 +99,23 @@ class XKahEngine:
         return self._switch_entity
 
     async def async_start(self) -> None:
-        self._unsub = async_track_state_change_event(
+        from datetime import timedelta
+
+        self._unsub_power = async_track_state_change_event(
             self.hass, self._power_sensor, self._async_handle_power_update
+        )
+        self._unsub_tick = async_track_time_interval(
+            self.hass, self._async_tick, timedelta(seconds=TICK_INTERVAL)
         )
         _LOGGER.info("XKah engine started for %s", self.entry.title)
 
     async def async_stop(self) -> None:
-        if self._unsub:
-            self._unsub()
-            self._unsub = None
+        if self._unsub_power:
+            self._unsub_power()
+            self._unsub_power = None
+        if self._unsub_tick:
+            self._unsub_tick()
+            self._unsub_tick = None
 
     @callback
     def _async_handle_power_update(self, event: Event) -> None:
@@ -118,6 +132,12 @@ class XKahEngine:
                 return
         self._current_power = power
         self._process_power(power, utcnow())
+
+    @callback
+    def _async_tick(self, now: datetime) -> None:
+        if self._state == STATE_OFF:
+            return
+        self._process_power(self._current_power, now)
 
     def _process_power(self, power: float, now: datetime) -> None:
         prev_state = self._state
